@@ -1892,8 +1892,11 @@ NullStreamFatal::~NullStreamFatal() {
   // would be inconsistent with NullStream behavior.
   std::abort();
 }
-
+//返回标记无返回失败处理的回调函数
+//注册处理失败的回调函数
+//参数是处理失败的回调函数
 logging_fail_func_t InstallFailureFunction(logging_fail_func_t fail_func) {
+  //使用exchange函数交换新旧回调函数并返回旧函数
   return std::exchange(g_logging_fail_func, fail_func);
 }
 
@@ -2615,6 +2618,7 @@ void MakeCheckOpValueString(std::ostream* os, const std::nullptr_t& /*v*/) {
 }  // namespace internal
 }  // namespace logging
 
+//使用gdb 调试glog初始化函数
 void InitGoogleLogging(const char* argv0) { InitGoogleLoggingUtilities(argv0); }
 
 void InstallPrefixFormatter(PrefixFormatterCallback callback, void* data) {

@@ -77,6 +77,7 @@ namespace google {
 
 static const char* g_program_invocation_short_name = nullptr;
 
+//使用g_program_invocation_short_name这个字符串指针变量来标记是否初始化过
 bool IsGoogleLoggingInitialized() {
   return g_program_invocation_short_name != nullptr;
 }
@@ -218,7 +219,9 @@ namespace google {
 
 inline namespace glog_internal_namespace_ {
 
+//对argv[0]进行清理留下程序名
 const char* const_basename(const char* filepath) {
+  //返回最后一次出现'/'的位置指针，没有返回nullptr
   const char* base = strrchr(filepath, '/');
 #ifdef GLOG_OS_WINDOWS  // Look for either path separator in Windows
   if (!base) base = strrchr(filepath, '\\');
@@ -296,8 +299,10 @@ void SetCrashReason(const logging::internal::CrashReason* r) {
   g_reason.compare_exchange_strong(expected, r);
 }
 
-void InitGoogleLoggingUtilities(const char* argv0) {
-  CHECK(!IsGoogleLoggingInitialized())
+//开始初始化工具
+void InitGoogleLoggingUtilities(const char* argv0/*对于linux就是调用时输入的程序名
+  可能是 ./a.out*/) {
+  CHECK(!IsGoogleLoggingInitialized())//使用内置的CHECK宏来检验日志是否已经初始化
       << "You called InitGoogleLogging() twice!";
   g_program_invocation_short_name = const_basename(argv0);
 
