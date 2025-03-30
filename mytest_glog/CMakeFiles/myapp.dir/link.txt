@@ -1,0 +1,1 @@
+/usr/bin/c++ -g CMakeFiles/myapp.dir/main.cpp.o -o myapp  -Wl,-rpath,/usr/local/lib /usr/local/lib/libglogd.so.0.8.0 /usr/lib/x86_64-linux-gnu/libgflags.so.2.2.2 
