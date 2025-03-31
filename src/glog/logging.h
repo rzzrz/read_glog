@@ -64,8 +64,9 @@
 #include "glog/platform.h"
 #include "glog/types.h"
 
-#if defined(__has_attribute)
-#  if __has_attribute(used)
+
+#if defined(__has_attribute)//这个就是有些编译器（clang/gcc）会内置的一个预处理宏，作用是保证编译器保留某些没有使用的静态变量以确保方便调试
+#  if __has_attribute(used)//嵌套，如果__has_attribute的话进一步检查 used
 #    define GLOG_USED __attribute__((used))
 #  endif  // __has_attribute(used)
 #endif    // defined(__has_attribute)
@@ -1193,6 +1194,8 @@ class GLOG_EXPORT LogMessage {
   // 2005 if you are deriving from a type in the Standard C++ Library"
   // http://msdn.microsoft.com/en-us/library/3tdb471s(VS.80).aspx
   // Let's just ignore the warning.
+  //禁用DLL导出类警告因为 继承的ostream虽然没有标记未导出类但是只要目标用户使用的
+  //是标准的c++编译器和标准的文件就可以忽视
   GLOG_MSVC_PUSH_DISABLE_WARNING(4275)
   class GLOG_EXPORT LogStream : public std::ostream {
     GLOG_MSVC_POP_WARNING()
@@ -1201,10 +1204,11 @@ class GLOG_EXPORT LogMessage {
     // linking against a Clang-built executable, this constructor will be
     // removed by the linker. We use this attribute to prevent the linker from
     // discarding it.
+    // __attribute__((used))
     GLOG_USED
     LogStream(char* buf, int len, int64 ctr)
         : std::ostream(nullptr), streambuf_(buf, len), ctr_(ctr), self_(this) {
-      rdbuf(&streambuf_);
+      rdbuf(&streambuf_);//std::ostream的成员函数，用于管理流的底层缓冲区。用于绑定或获取缓冲区对象
     }
 
     LogStream(LogStream&& other) noexcept

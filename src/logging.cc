@@ -1541,6 +1541,7 @@ LogMessage::LogMessage(const char* file, int line,
   stream() << "Check failed: " << (*result.str_) << " ";
 }
 
+//初始化LogMessage实力
 LogMessage::LogMessage(const char* file, int line) : allocated_(nullptr) {
   Init(file, line, GLOG_INFO, &LogMessage::SendToLog);
 }
@@ -1573,8 +1574,9 @@ LogMessage::LogMessage(const char* file, int line, LogSeverity severity,
   data_->message_ = message;  // override Init()'s setting to nullptr
 }
 
+
 void LogMessage::Init(const char* file, int line, LogSeverity severity,
-                      void (LogMessage::*send_method)()) {
+                      void (LogMessage::*send_method)()/*sinks*/) {
   allocated_ = nullptr;
   if (severity != GLOG_FATAL || !exit_on_dfatal) {
 #ifdef GLOG_THREAD_LOCAL_STORAGE
@@ -1626,18 +1628,21 @@ void LogMessage::Init(const char* file, int line, LogSeverity severity,
   // We exclude the thread_id for the default thread.
   if (FLAGS_log_prefix && (line != kNoLogPrefix)) {
     std::ios saved_fmt(nullptr);
-    saved_fmt.copyfmt(stream());
-    stream().fill('0');
-    if (g_prefix_formatter == nullptr) {
+    saved_fmt.copyfmt(stream());//保存流的格式 以便自定义流了之后会出 原来流格式的状态
+    stream().fill('0');//填充 0
+    if (g_prefix_formatter == nullptr) {//没有自定义输出格式的话
       stream() << LogSeverityNames[severity][0];
       if (FLAGS_log_year_in_prefix) {
         stream() << setw(4) << 1900 + time_.year();
       }
-      stream() << setw(2) << 1 + time_.month() << setw(2) << time_.day() << ' '
-               << setw(2) << time_.hour() << ':' << setw(2) << time_.min()
-               << ':' << setw(2) << time_.sec() << "." << setw(6)
-               << time_.usec() << ' ' << setfill(' ') << setw(5)
-               << data_->thread_id_ << setfill('0') << ' ' << data_->basename_
+      stream() << setw(2) << 1 + time_.month() 
+               << setw(2) << time_.day() << ' '
+               << setw(2) << time_.hour() << ':' 
+               << setw(2) << time_.min() << ':' 
+               << setw(2) << time_.sec() << "." 
+               << setw(6) << time_.usec() << ' ' << setfill(' ') 
+               << setw(5) << data_->thread_id_ 
+               << setfill('0') << ' ' << data_->basename_
                << ':' << data_->line_ << "] ";
     } else {
       (*g_prefix_formatter)(stream(), *this);
@@ -1994,7 +1999,7 @@ ostream& operator<<(ostream& os, const Counter_t&) {
   LogMessage::LogStream* log = static_cast<LogMessage::LogStream*>(&os);
 #else
   auto* log = dynamic_cast<LogMessage::LogStream*>(&os);
-#endif
+#endif 
   CHECK(log && log == log->self())
       << "You must not use COUNTER with non-glog ostream";
   os << log->ctr();
