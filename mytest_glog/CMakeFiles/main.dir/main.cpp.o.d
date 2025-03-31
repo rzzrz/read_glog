@@ -1,5 +1,5 @@
 CMakeFiles/main.dir/main.cpp.o: \
- /home/rzz-rz/c++_code/mytest_glog/main.cpp /usr/include/stdc-predef.h \
+ /home/rzz-rz/read_glog/mytest_glog/main.cpp /usr/include/stdc-predef.h \
  /usr/local/include/glog/logging.h /usr/include/c++/13/atomic \
  /usr/include/c++/13/bits/atomic_base.h \
  /usr/include/x86_64-linux-gnu/c++/13/bits/c++config.h \

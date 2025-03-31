@@ -1,4 +1,4 @@
-# Install script for directory: /home/rzz-rz/c++_code/mytest_glog
+# Install script for directory: /home/rzz-rz/read_glog/mytest_glog
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -50,5 +50,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/home/rzz-rz/c++_code/mytest_glog/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/home/rzz-rz/read_glog/mytest_glog/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
