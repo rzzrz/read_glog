@@ -908,7 +908,12 @@ namespace google {
   google::LogMessage(__FILE__, __LINE__, google::GLOG_##severity).stream()
 
 #define SOME_KIND_OF_LOG_EVERY_N(severity, n, what_to_do)               \
-  static std::atomic<int> LOG_OCCURRENCES(0), LOG_OCCURRENCES_MOD_N(0); \
+  static std::atomic<int> LOG_OCCURRENCES(0)/*变量名生成宏*/, LOG_OCCURRENCES_MOD_N(0); \
+  // 在多线程环境中，如果多个线程会读写 LOG_TIME_PERIOD 变量，
+  // 且没有显式同步（如互斥锁），TSan 会报告数据竞争。
+  // 如果开发者确定这种竞争不会导致逻辑错误（例如变量是原子操作或设计上允许异步更新），
+  // 则可通过此宏抑制警告。就是标记上面两个原子变量是线程安全的
+  // 使用Tsan的时候不报错
   GLOG_IFDEF_THREAD_SANITIZER(AnnotateBenignRaceSized(                  \
       __FILE__, __LINE__, &LOG_OCCURRENCES, sizeof(int), ""));          \
   GLOG_IFDEF_THREAD_SANITIZER(AnnotateBenignRaceSized(                  \
