@@ -866,6 +866,7 @@ DECLARE_CHECK_STROP_IMPL(strcasecmp, false)
 
 // Use macro expansion to create, for each use of LOG_EVERY_N(), static
 // variables with the __LINE__ expansion as part of the variable name.
+// 这个部分就是使用宏生成对应行数的occurrences_xx的变量名
 #define LOG_EVERY_N_VARNAME(base, line) LOG_EVERY_N_VARNAME_CONCAT(base, line)
 #define LOG_EVERY_N_VARNAME_CONCAT(base, line) base##line
 

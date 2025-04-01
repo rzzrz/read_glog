@@ -12,7 +12,8 @@ int main(int argc, char* argv[]){
     int num_cookies = 1;
     
     //google::InstallPrefixFormatter(myformatter);
-    LOG_IF(INFO, num_cookies > 10) << "Got lots of cookies";
+    //LOG_IF(INFO, num_cookies > 10) << "Got lots of cookies";
+    LOG_EVERY_N(INFO, 10) << "Got the " << google::COUNTER << "th cookie";
     std::cout<<"glog success"<<std::endl;
     
     return 0;
