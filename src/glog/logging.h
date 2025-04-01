@@ -1206,6 +1206,7 @@ class GLOG_EXPORT LogMessage {
   //禁用DLL导出类警告因为 继承的ostream虽然没有标记未导出类但是只要目标用户使用的
   //是标准的c++编译器和标准的文件就可以忽视
   GLOG_MSVC_PUSH_DISABLE_WARNING(4275)
+  //继承otream的一个派生类
   class GLOG_EXPORT LogStream : public std::ostream {
     GLOG_MSVC_POP_WARNING()
    public:
@@ -1214,12 +1215,15 @@ class GLOG_EXPORT LogMessage {
     // removed by the linker. We use this attribute to prevent the linker from
     // discarding it.
     // __attribute__((used))
+    //  ||
+    //  \/
     GLOG_USED
-    LogStream(char* buf, int len, int64 ctr)
+    LogStream(char* buf, int len, int64 ctr)//普通构造
         : std::ostream(nullptr), streambuf_(buf, len), ctr_(ctr), self_(this) {
       rdbuf(&streambuf_);//std::ostream的成员函数，用于管理流的底层缓冲区。用于绑定或获取缓冲区对象
     }
 
+    //重载的移动构造
     LogStream(LogStream&& other) noexcept
         : std::ostream(nullptr),
           streambuf_(std::move(other.streambuf_)),
@@ -1228,6 +1232,7 @@ class GLOG_EXPORT LogMessage {
       rdbuf(&streambuf_);
     }
 
+    //移动赋值运算符
     LogStream& operator=(LogStream&& other) noexcept {
       streambuf_ = std::move(other.streambuf_);
       ctr_ = std::exchange(other.ctr_, 0);
@@ -1255,6 +1260,7 @@ class GLOG_EXPORT LogMessage {
 
  public:
   // icc 8 requires this typedef to avoid an internal compiler error.
+  // 输出日志的函数指针 老编译器可能因为名称过于复杂出现问题 起别名防止编译器内部错误
   typedef void (LogMessage::*SendMethod)();
 
   LogMessage(const char* file, int line, LogSeverity severity, int64 ctr,
@@ -1268,6 +1274,7 @@ class GLOG_EXPORT LogMessage {
   //
   // Using this constructor instead of the more complex constructor above
   // saves 19 bytes per call site.
+  // 为一些简单LOG调用重载对应的构造函数节省内存
   LogMessage(const char* file, int line);
 
   // Used for LOG(severity) where severity != INFO.  Implied
@@ -1308,6 +1315,7 @@ class GLOG_EXPORT LogMessage {
 
   // An arbitrary limit on the length of a single log message.  This
   // is so that streaming can be done more efficiently.
+  // 设置耽搁日志最大长度 更有效率
   static const size_t kMaxLogMessageLen;
 
   // These should not be called directly outside of logging.*,
@@ -1356,6 +1364,7 @@ class GLOG_EXPORT LogMessage {
 
   // We keep the data in a separate struct so that each instance of
   // LogMessage uses less stack space.
+  // 也就用指针指向在堆上分配的空间减少自己占用的空间
   logging::internal::LogMessageData* allocated_;
   logging::internal::LogMessageData* data_;
   LogMessageTime time_;
