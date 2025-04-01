@@ -530,6 +530,9 @@ class LogSink;  // defined below
   LOG_TO_STRING_##severity(static_cast<std::vector<std::string>*>(outvec)) \
       .stream()
 
+//LOG_X的宏定义
+//如果 condition 是 flase 的话那么就直接让宏展开为0
+//这样在执行的时候就不会出现其他的日志活动降低了性能开销
 #define LOG_IF(severity, condition) \
   static_cast<void>(0),             \
       !(condition)                  \

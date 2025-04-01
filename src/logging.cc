@@ -348,13 +348,14 @@ constexpr std::intmax_t kSecondsInDay = 60 * 60 * 24;
 constexpr std::intmax_t kSecondsInWeek = kSecondsInDay * 7;
 
 // Optional user-configured callback to print custom prefixes.
-class PrefixFormatter {
+class PrefixFormatter {//自定义的输出格式类
  public:
   PrefixFormatter(PrefixFormatterCallback callback, void* data) noexcept
       : version{V2}, callback_v2{callback}, data{data} {}
 
+  //仿函数  
   void operator()(std::ostream& s, const LogMessage& message) const {
-    switch (version) {
+    switch (version) {//提高扩展性 为以后的多回调函数做准备
       case V2:
         callback_v2(s, message, data);
         break;
@@ -2626,8 +2627,10 @@ void MakeCheckOpValueString(std::ostream* os, const std::nullptr_t& /*v*/) {
 //使用gdb 调试glog初始化函数
 void InitGoogleLogging(const char* argv0) { InitGoogleLoggingUtilities(argv0); }
 
+//注册自己的输出格式
 void InstallPrefixFormatter(PrefixFormatterCallback callback, void* data) {
   if (callback != nullptr) {
+    //用智能指针管理自定义格式回调函数
     g_prefix_formatter = std::make_unique<PrefixFormatter>(callback, data);
   } else {
     g_prefix_formatter = nullptr;

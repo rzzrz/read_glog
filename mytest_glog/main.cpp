@@ -14,6 +14,6 @@ int main(int argc, char* argv[]){
     //google::InstallPrefixFormatter(myformatter);
     LOG_IF(INFO, num_cookies > 10) << "Got lots of cookies";
     std::cout<<"glog success"<<std::endl;
-
+    
     return 0;
 }
