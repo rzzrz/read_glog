@@ -1596,6 +1596,7 @@ namespace base {
 
 class GLOG_EXPORT Logger {
  public:
+  //虚析构函数确保多肽时正确调用
   virtual ~Logger();
 
   // Writes "message[0,message_len-1]" corresponding to an event that
