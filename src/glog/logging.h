@@ -1438,6 +1438,7 @@ T CheckNotNull(const char* file, int line, const char* names, T&& t) {
   return std::forward<T>(t);
 }
 
+//就是用结构体LogMessageVoidify
 struct LogMessageVoidify {
   // This has to be an operator with a precedence lower than << but
   // higher than ?:
@@ -1478,6 +1479,7 @@ GLOG_EXPORT void SetLogSymlink(LogSeverity severity,
 // Users should subclass LogSink and override send to do whatever they want.
 // Implementations must be thread-safe because a shared instance will
 // be called from whichever thread ran the LOG(XXX) line.
+// 要求要继承LogSink和保证线程安全
 class GLOG_EXPORT LogSink {
  public:
   virtual ~LogSink();
@@ -1503,6 +1505,8 @@ class GLOG_EXPORT LogSink {
   // handles real logging while itself making some LOG() calls;
   // WaitTillSent() can be implemented to wait for that logic to complete.
   // See our unittest for an example.
+  // 也就是有时候可能是多线程 你讲日志信息发送至处理队列之后，队列里面还有其他信息
+  // 由于某种需求你要等待这个完全的写完之后就才能执行别的工作。
   virtual void WaitTillSent();
 
   // Returns the normal text output of the log message.
@@ -1555,6 +1559,8 @@ GLOG_EXPORT const std::vector<std::string>& GetLoggingDirectories();
 // Print any fatal message again -- useful to call from signal handler
 // so that the last thing in the output is the fatal message.
 // Thread-hostile, but a race is unlikely.
+// 在处理一些不可恢复的信号的时候，把最后重要的日志都打印之后再处理这样保证了
+// 日志的完整
 GLOG_EXPORT void ReprintFatalMessage();
 
 // Truncate a log file that may be the append-only output of multiple
@@ -1567,7 +1573,7 @@ GLOG_EXPORT void ReprintFatalMessage();
 GLOG_EXPORT void TruncateLogFile(const char* path, uint64 limit, uint64 keep);
 
 // Truncate stdout and stderr if they are over the value specified by
-// --max_log_size; keep the final 1MB.  This function has the same
+// --max_log_size; keep the final 1MB.  This funct ion has the same
 // race condition as TruncateLogFile.
 GLOG_EXPORT void TruncateStdoutStderr();
 
