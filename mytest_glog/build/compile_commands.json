@@ -1,0 +1,8 @@
+[
+{
+  "directory": "/home/rzz-rz/read_glog/mytest_glog/build",
+  "command": "/usr/bin/c++ -DGFLAGS_IS_A_DLL=0 -DGLOG_USE_GFLAGS -DGLOG_USE_GLOG_EXPORT -g -g3 -O0 -o CMakeFiles/main.dir/main.cpp.o -c /home/rzz-rz/read_glog/mytest_glog/main.cpp",
+  "file": "/home/rzz-rz/read_glog/mytest_glog/main.cpp",
+  "output": "CMakeFiles/main.dir/main.cpp.o"
+}
+]
