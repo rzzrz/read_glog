@@ -1,10 +1,15 @@
 #include <glog/logging.h>
-
+#include <chrono>
+#include <thread>
+#include <iostream>
 int main(int argc, char* argv[]){
   google::InitGoogleLogging(argv[0]);
-  for (int i = 0; i < 30; i++) {
-    LOG_EVERY_N(INFO, 10) << "会在执行第1, 11, 21次log";
+  for (int i = 0; i < 2048; i++) {
+    LOG_EVERY_T(INFO, 0.01) << "获得一个cookie"; // 每10ms
+    LOG_EVERY_T(INFO, 2.35) << "获得一个cookie"; // 每2.35秒
   }
-    
-return 0;
+  while (1) {
+    std::cout<<"this thread runing"<<std::endl;
+  }
+  return 0;
 }

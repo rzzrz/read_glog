@@ -266,3 +266,136 @@ I20250422 17:06:04.222343 139899694952000 main.cpp:6] 会在执行第1, 11, 21�
 
 也就是通过宏的```##```和```__LINE__```操作 以及static修饰定义原子变量实现计数
 并判断condition以及两个原子变量之间的关系进行比较结果决定是否进行log
+
+### LOG_IF_EVERY_N
+
+```c++
+// 该宏可以实现每n次并满足条件时进行log
+LOG_IF_EVERY_N(INFO, (size > 1024), 10) << "获得第" << google::COUNTER
+                                       << "个大cookie";
+```
+
+```c++
+// 最后结果
+GNU nano 7.2                    main.rzzrz.rzz-rz.log.INFO.20250424-122715.27680                              Log file created at: 2025/04/24 12:27:15
+Running on machine: rzzrz
+Running duration (h:mm:ss): 0:00:00
+Log line format: [IWEF]yyyymmdd hh:mm:ss.uuuuuu threadid file:line] msg
+I20250424 12:27:15.815013 140094245674560 main.cpp:6] 获得第1026个大cookie
+I20250424 12:27:15.815419 140094245674560 main.cpp:6] 获得第1036个大cookie
+I20250424 12:27:15.815426 140094245674560 main.cpp:6] 获得第1046个大cookie
+I20250424 12:27:15.815429 140094245674560 main.cpp:6] 获得第1056个大cookie
+I20250424 12:27:15.815431 140094245674560 main.cpp:6] 获得第1066个大cookie
+I20250424 12:27:15.815433 140094245674560 main.cpp:6] 获得第1076个大cookie
+I20250424 12:27:15.815435 140094245674560 main.cpp:6] 获得第1086个大cookie
+I20250424 12:27:15.815438 140094245674560 main.cpp:6] 获得第1096个大cookie
+I20250424 12:27:15.815440 140094245674560 main.cpp:6] 获得第1106个大cookie
+I20250424 12:27:15.815442 140094245674560 main.cpp:6] 获得第1116个大cookie
+```
+
+```c++
+// 源码实现和上面的差不多只是加了一些条件判断
+#define SOME_KIND_OF_LOG_IF_EVERY_N(severity, condition, n, what_to_do)       \
+  static std::atomic<int> LOG_OCCURRENCES(0), LOG_OCCURRENCES_MOD_N(0);       \
+  GLOG_IFDEF_THREAD_SANITIZER(AnnotateBenignRaceSized(                        \
+      __FILE__, __LINE__, &LOG_OCCURRENCES, sizeof(int), ""));                \
+  GLOG_IFDEF_THREAD_SANITIZER(AnnotateBenignRaceSized(                        \
+      __FILE__, __LINE__, &LOG_OCCURRENCES_MOD_N, sizeof(int), ""));          \
+  ++LOG_OCCURRENCES;                                                          \
+  if ((condition) &&                                                          \
+      ((LOG_OCCURRENCES_MOD_N = (LOG_OCCURRENCES_MOD_N + 1) % n) == (1 % n))) \
+  google::LogMessage(__FILE__, __LINE__, google::GLOG_##severity,             \
+                     LOG_OCCURRENCES, &what_to_do)                            \
+      .stream()
+```
+
+### LOG_FIRST_N
+
+``` c++
+
+LOG_FIRST_N(INFO, 20) << "获得第" << google::COUNTER << "个cookie";
+
+// 结果 只log前20次
+
+  GNU nano 7.2                    main.rzzrz.rzz-rz.log.INFO.20250424-123212.28832                              Log file created at: 2025/04/24 12:32:12
+Running on machine: rzzrz
+Running duration (h:mm:ss): 0:00:00
+Log line format: [IWEF]yyyymmdd hh:mm:ss.uuuuuu threadid file:line] msg
+I20250424 12:32:12.623370 140164973207104 main.cpp:6] 获得第1个cookie
+I20250424 12:32:12.623833 140164973207104 main.cpp:6] 获得第2个cookie
+I20250424 12:32:12.623840 140164973207104 main.cpp:6] 获得第3个cookie
+I20250424 12:32:12.623843 140164973207104 main.cpp:6] 获得第4个cookie
+I20250424 12:32:12.623846 140164973207104 main.cpp:6] 获得第5个cookie
+I20250424 12:32:12.623848 140164973207104 main.cpp:6] 获得第6个cookie
+I20250424 12:32:12.623850 140164973207104 main.cpp:6] 获得第7个cookie
+I20250424 12:32:12.623853 140164973207104 main.cpp:6] 获得第8个cookie
+I20250424 12:32:12.623855 140164973207104 main.cpp:6] 获得第9个cookie
+I20250424 12:32:12.623857 140164973207104 main.cpp:6] 获得第10个cookie
+I20250424 12:32:12.623860 140164973207104 main.cpp:6] 获得第11个cookie
+I20250424 12:32:12.623862 140164973207104 main.cpp:6] 获得第12个cookie
+I20250424 12:32:12.623864 140164973207104 main.cpp:6] 获得第13个cookie
+I20250424 12:32:12.623867 140164973207104 main.cpp:6] 获得第14个cookie
+I20250424 12:32:12.623869 140164973207104 main.cpp:6] 获得第15个cookie
+I20250424 12:32:12.623871 140164973207104 main.cpp:6] 获得第16个cookie
+I20250424 12:32:12.623874 140164973207104 main.cpp:6] 获得第17个cookie
+I20250424 12:32:12.623876 140164973207104 main.cpp:6] 获得第18个cookie
+I20250424 12:32:12.623878 140164973207104 main.cpp:6] 获得第19个cookie
+I20250424 12:32:12.623881 140164973207104 main.cpp:6] 获得第20个cookie
+```
+
+### LOG_EVERY_T
+### LOG_EVERY_T
+
+```c++
+// 与时间操作有关的log宏
+LOG_EVERY_T(INFO, 0.01) << "获得一个cookie";  // 每10ms
+LOG_EVERY_T(INFO, 2.35) << "获得一个cookie";  // 每2.35秒
+```
+
+```c++
+// 
+#define SOME_KIND_OF_LOG_EVERY_T(severity, seconds)                            \
+								// 和LOG_EVERY_N中的LOG_OCCURRENCES一样也是使用
+								// 使用__LINE__实现定义独特的变量名
+// 记录持续时间
+  constexpr std::chrono::nanoseconds LOG_TIME_PERIOD =                         \
+      std::chrono::duration_cast<std::chrono::nanoseconds>(                    \
+          std::chrono::duration<double>(seconds));                             \
+  
+  // 静态的原子变量,避免重复定义并保证线程安全
+  static std::atomic<google::int64> LOG_PREVIOUS_TIME_RAW;                     \
+  GLOG_IFDEF_THREAD_SANITIZER(AnnotateBenignRaceSized(                         \
+      __FILE__, __LINE__, &LOG_TIME_PERIOD, sizeof(google::int64), ""));       \
+  GLOG_IFDEF_THREAD_SANITIZER(AnnotateBenignRaceSized(                         \
+      __FILE__, __LINE__, &LOG_PREVIOUS_TIME_RAW, sizeof(google::int64), "")); \
+  const auto LOG_CURRENT_TIME =                                                \
+      std::chrono::duration_cast<std::chrono::nanoseconds>(                    \
+                                          // 获取时钟元年之后的数据
+          std::chrono::steady_clock::now().time_since_epoch());                \
+  const auto LOG_PREVIOUS_TIME =                                               \
+      // 使用松散内存序加载LOG_PREVIOUS_TIME,但可能会导致其他缓存中的值未更新到内存中导致语序问题
+      LOG_PREVIOUS_TIME_RAW.load(std::memory_order_relaxed);                   \
+  const auto LOG_TIME_DELTA =                                                  \
+      LOG_CURRENT_TIME - std::chrono::nanoseconds(LOG_PREVIOUS_TIME);          \
+  if (LOG_TIME_DELTA > LOG_TIME_PERIOD)                                        \
+    LOG_PREVIOUS_TIME_RAW.store(                                               \
+        std::chrono::duration_cast<std::chrono::nanoseconds>(LOG_CURRENT_TIME) \
+            .count(),                                                          \
+        std::memory_order_relaxed);                                            \
+  if (LOG_TIME_DELTA > LOG_TIME_PERIOD)                                        \
+  google::LogMessage(__FILE__, __LINE__, google::GLOG_##severity).stream()
+```
+
+上面代码实现要注意的问题如下
+
+- 使用constexpr提高性能,且确保是编译器常量
+
+  限定使用者输入的时间间隔的变量应该是编译器常量,并且能在编译器进行编译,给编译器提供优化空间提高性能
+
+- 使用nanoseconds(纳秒)类型提高精度
+
+  首先让用户输入的可能的double类型转换成统一的duration类型,然后转换为纳秒的高精度类型最后进行比较,调高精度
+
+- 对于memory_order_relaxed内存序的使用
+
+  了性能提升,但是会导致多个线程之间语序的问题
