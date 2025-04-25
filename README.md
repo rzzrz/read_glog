@@ -130,7 +130,7 @@ int main(int argc, char* argv[]){
 
 调用 ```google::InitGoogleLogging(argv[0]);```函数对glog初始化
 
-## 条件/偶尔日志记录
+### 条件/偶尔日志记录
 
 ### LOG_IF
 
@@ -398,4 +398,219 @@ LOG_EVERY_T(INFO, 2.35) << "获得一个cookie";  // 每2.35秒
 
 - 对于memory_order_relaxed内存序的使用
 
-  了性能提升,但是会导致多个线程之间语序的问题
+  了性能提升,但是会导致多个线程之间语序的问题 
+
+### 在调试复杂问题时，详细的日志消息非常有用。glog提供`VLOG`宏定义自定义数字日志级别。
+
+```bash
+// 在程序运行开始时可以使用下面的语法
+./your_app --vmodule=mapreduce=2,file=1,gfs*=3 --v=0
+// 这就是实现了 
+// 从mapreduce.{h,cc}记录VLOG(2)及以下级别
+// 从file.{h,cc}记录VLOG(1)及以下级别
+// 从"gfs"前缀文件记录VLOG(3)及以下级别
+// 其他位置记录VLOG(0)及以下级别
+
+// 也就是可以做到分模块(文件)设置不同的log上限等级
+```
+
+### 数字严重等级LOG使用
+
+```c++
+VLOG(1) << "当--v=1或更高时打印此消息";
+VLOG(2) << "当--v=2或更高时打印此消息";
+```
+
+```c++
+// 源码实现
+// 该处实现服用了 LOG_IF的实现,使用VLOG_IS_ON的宏来判断是否log
+#define VLOG(verboselevel) LOG_IF(INFO, VLOG_IS_ON(verboselevel))
+
+// --------------------------------
+
+// glog的源码解释:首先使用GUN C的扩展来
+#if defined(__GNUC__)
+#efine VLOG_IS_ON(verboselevel)                                       \
+// 这里使用了GNU的复合语句表达式
+    __extension__({                                                      \
+    // 定义一个本文件的静态变量，注意当前的静态变量被"{}"包裹随意,可见范围就仅是当前展开的语句
+    // 这样实现的每一个调用位置都有自己独立的站点信息,可以尽量的实现细粒度
+      static google::SiteFlag vlocal__ = {nullptr, nullptr, 0, nullptr}; \
+      GLOG_IFDEF_THREAD_SANITIZER(AnnotateBenignRaceSized(               \
+          __FILE__, __LINE__, &vlocal__, sizeof(google::SiteFlag), "")); \
+      google::int32 verbose_level__ = (verboselevel);                    \
+      (vlocal__.level == nullptr
+            // 该位置的函数是将刚刚定义的站点进行绑定
+      	    // 就是查询当前文件用户要求的数字严重等级的上限等
+           ? google::InitVLOG3__(&vlocal__, &FLAGS_v, __FILE__,          \
+                                 verbose_level__)                        \
+           : *vlocal__.level >= verbose_level__);                        \
+    })
+#else
+   //不支持GUN C扩展标准的编译器就不会支持模块化的log
+// GNU extensions not available, so we do not support --vmodule.
+// Dynamic value of FLAGS_v always controls the logging level.
+#  define VLOG_IS_ON(verboselevel) (FLAGS_v >= (verboselevel))
+#endif
+
+//--------------------------------
+
+// 查询某个文件用户所要求的数字严重等级上限
+bool InitVLOG3__(SiteFlag* site_flag, int32* level_default, const char* fname,
+                 int32 verbose_level) {
+  std::lock_guard<std::mutex> l(vmodule_mutex);
+  bool read_vmodule_flag = inited_vmodule;
+  if (!read_vmodule_flag) {// 查看是否初始化
+    VLOG2Initializer();// 初始化VLOG系统
+  }
+
+  // protect the errno global in case someone writes:
+  // VLOG(..) << "The last error was " << strerror(errno)
+  int old_errno = errno;
+
+  // site_default normally points to FLAGS_v
+  int32* site_flag_value = level_default;
+
+  // Get basename for file
+  const char* base = strrchr(fname, '/');
+
+#ifdef _WIN32
+  if (!base) {
+    base = strrchr(fname, '\\');
+  }
+#endif
+
+  base = base ? (base + 1) : fname;
+  const char* base_end = strchr(base, '.');
+  size_t base_length =
+      base_end ? static_cast<size_t>(base_end - base) : strlen(base);
+
+  // Trim out trailing "-inl" if any
+  if (base_length >= 4 && (memcmp(base + base_length - 4, "-inl", 4) == 0)) {
+    base_length -= 4;
+  }
+
+  // TODO: Trim out _unittest suffix?  Perhaps it is better to have
+  // the extra control and just leave it there.
+
+  // find target in vector of modules, replace site_flag_value with
+  // a module-specific verbose level, if any.
+  for (const VModuleInfo* info = vmodule_list; info != nullptr;
+       info = info->next) {
+    if (SafeFNMatch_(info->module_pattern.c_str(), info->module_pattern.size(),
+                     base, base_length)) {
+      site_flag_value = &info->vlog_level;// 站点的数字严重级别指针指向用户定义的严重级别
+      // value at info->vlog_level is now what controls
+      // the VLOG at the caller site forever
+      break;
+    }
+  }
+
+  // Cache the vlog value pointer if --vmodule flag has been parsed.
+  ANNOTATE_BENIGN_RACE(site_flag,
+                       "*site_flag may be written by several threads,"
+                       " but the value will be the same");
+  if (read_vmodule_flag) {
+    site_flag->level = site_flag_value;
+    // If VLOG flag has been cached to the default site pointer,
+    // we want to add to the cached list in order to invalidate in case
+    // SetVModule is called afterwards with new modules.
+    // The performance penalty here is neglible, because InitVLOG3__ is called
+    // once per site.
+    if (site_flag_value == level_default && !site_flag->base_name) {
+      site_flag->base_name = base;
+      site_flag->base_len = base_length;
+      site_flag->next = cached_site_list;
+      cached_site_list = site_flag;
+    }
+  }
+
+  // restore the errno in case something recoverable went wrong during
+  // the initialization of the VLOG mechanism (see above note "protect the..")
+  errno = old_errno;
+  return *site_flag_value >= verbose_level;
+}
+```
+源码关键点解释
+- 复合语句表达式
+
+  这是一种属于GNU C的扩展语法,允许将一个或者多个语句合成为一个表达式,最后表达式的值会是最后一个语句的值
+
+  在上面的实现就会是三目表达式的值
+  
+  解释一下为什么要用复合语句表达式来实现，而不是原版标准c++标准的那种宏展开呢？
+  
+  首先我们需要一个bool值告诉当前宏到底要不要进行log，且想要实现分文件的日志等级的限制，根据上述的限制推像到，宏展开的最后应当返回bool值，并且能够定义一个仅当前文件可见的静态变量(glog实现的是当前调用出可见的,但最后结果还是分文件可见)来记录指导当前文件下的日志记录行文。
+  
+### 还有在`DEBUG`模式下才会生效的```log```，避免```release```下的程序由于过多的日志记录降低性能
+
+```c++
+DLOG(INFO) << "找到cookies";
+DLOG_IF(INFO, num_cookies > 10) << "获得大量cookies";
+DLOG_EVERY_N(INFO, 10) << "获得第" << google::COUNTER << "个cookie";
+DLOG_FIRST_N(INFO, 10) << "获得第" << google::COUNTER << "个cookie";
+DLOG_EVERY_T(INFO, 0.01) << "获得一个cookie";
+
+```
+
+### 运行时检查
+
+`CHECK`宏提供了在条件不满足时中止程序的能力，类似于标准C库中的`assert`宏。
+
+与`assert`不同，`CHECK`不受`NDEBUG`控制，无论编译模式如何都会执行检查。因此以下示例中的`fp->Write(x)`总是会执行：
+
+```c++
+CHECK(fp->Write(x) == 4) << "写入失败!";
+
+// 实现
+#define CHECK(condition)                                       \
+			// GOOGLE_PREDICT_BRANCH_NOT_TAKEN分支预测的优化宏
+  LOG_IF(FATAL, GOOGLE_PREDICT_BRANCH_NOT_TAKEN(!(condition))) \
+      << "Check failed: " #condition " "
+```
+
+提供多种辅助宏用于相等/不等检查：
+
+- `CHECK_EQ`、`CHECK_NE`、`CHECK_LE`、`CHECK_LT`、`CHECK_GE`和`CHECK_GT`。它们比较两个值，当结果不符合预期时记录包含这两个值的`FATAL`消息。这些值必须支持`operator<<(ostream, ...)`。
+
+  ```c++
+  // 可以看到每个比较的检查宏都是一个统一的CHECK_OP宏实现的
+  #define CHECK_EQ(val1, val2) CHECK_OP(_EQ, ==, val1, val2)
+  #define CHECK_NE(val1, val2) CHECK_OP(_NE, !=, val1, val2)
+  #define CHECK_LE(val1, val2) CHECK_OP(_LE, <=, val1, val2)
+  #define CHECK_LT(val1, val2) CHECK_OP(_LT, <, val1, val2)
+  #define CHECK_GE(val1, val2) CHECK_OP(_GE, >=, val1, val2)
+  #define CHECK_GT(val1, val2) CHECK_OP(_GT, >, val1, val2)
+  
+  // CHECK_OP的实现
+  #if defined(STATIC_ANALYSIS)
+  // Only for static analysis tool to know that it is equivalent to assert
+  #  define CHECK_OP_LOG(name, op, val1, val2, log) CHECK((val1)op(val2))
+  #elif DCHECK_IS_ON()
+  using _Check_string = std::string;
+  #  define CHECK_OP_LOG(name, op, val1, val2, log)                              \
+  		// std::unquie_ptr来管理会在堆上申请内存
+      while (std::unique_ptr<google::logging::internal::_Check_string> _result = \
+      			// 根据传入的name(标记是哪种比较)来调用对应的实现函数
+                 google::logging::internal::Check##name##Impl(                   \
+                     google::logging::internal::GetReferenceableValue(val1),     \
+                     google::logging::internal::GetReferenceableValue(val2),     \
+                     #val1 " " #op " " #val2))                                   \
+      log(__FILE__, __LINE__,                                                    \
+          google::logging::internal::CheckOpString(std::move(_result)))          \
+          .stream()
+  #else
+  // In optimized mode, use CheckOpString to hint to compiler that
+  // the while condition is unlikely.
+  #  define CHECK_OP_LOG(name, op, val1, val2, log)                          \
+  		// 直接在栈上构造提高release模式下提高性能
+      while (google::logging::internal::CheckOpString _result =              \
+                 google::logging::internal::Check##name##Impl(               \
+                     google::logging::internal::GetReferenceableValue(val1), \
+                     google::logging::internal::GetReferenceableValue(val2), \
+                     #val1 " " #op " " #val2))                               \
+      log(__FILE__, __LINE__, _result).stream()
+  #endif  // STATIC_ANALYSIS, DCHECK_IS_ON()
+  ```
+
+  
