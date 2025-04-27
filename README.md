@@ -15,7 +15,6 @@
 
 ### 源码阅读方式
 依据官方文档给出的函数使用方式，使用程序调试进行了解追溯函数的调用流程，以及总结每个类之间的关系，了解特殊技巧等 
-开始！
 
 ## 源码阅读开始！
 
@@ -603,7 +602,7 @@ CHECK(fp->Write(x) == 4) << "写入失败!";
   // In optimized mode, use CheckOpString to hint to compiler that
   // the while condition is unlikely.
   #  define CHECK_OP_LOG(name, op, val1, val2, log)                          \
-  		// 直接在栈上构造提高release模式下提高性能
+  		// 直接在栈上构造，提高release模式下性能
       while (google::logging::internal::CheckOpString _result =              \
                  google::logging::internal::Check##name##Impl(               \
                      google::logging::internal::GetReferenceableValue(val1), \
@@ -614,3 +613,100 @@ CHECK(fp->Write(x) == 4) << "写入失败!";
   ```
 
   
+
+### Google风格`perror()`
+
+头文件`<glog/raw_logging.h>`提供线程安全的日志记录，不分配内存或获取锁。因此这些宏可用于低级内存分配和同步代码。
+
+`PLOG()`、`PLOG_IF()`和`PCHECK()`行为类似于对应的`LOG*`和`CHECK`宏，但会在输出行附加`errno`的当前状态描述。例如：
+
+```
+PCHECK(write(1, nullptr, 2) >= 0) << "写入nullptr失败";
+```
+
+此检查失败时会输出：
+
+```
+F0825 185142 test.cc:22] 检查失败: write(1, nullptr, 2) >= 0 写入nullptr失败: 错误地址 [14]
+```
+
+## 系统日志
+
+提供`SYSLOG`、`SYSLOG_IF`和`SYSLOG_EVERY_N`宏。这些消息会同时记录到系统日志和普通日志中。请注意记录系统日志可能严重影响性能，特别是当系统日志配置为远程记录时！在使用这些宏前请确保了解其影响。通常建议谨慎使用这些宏。
+
+```c++
+// 测试程序
+#include <glog/logging.h>
+int main(int argc, char* argv[]){
+  google::InitGoogleLogging(argv[0]);
+
+  SYSLOG(INFO)<<"这是一条对于系统log的测试";
+
+  return 0;
+}
+```
+
+```bash
+// 测试结果
+GNU nano 7.2                                              main.INFO                                                        Log file created at: 2025/04/27 15:28:47
+Running on machine: rzzrz
+Running duration (h:mm:ss): 0:00:-8
+Log line format: [IWEF]yyyymmdd hh:mm:ss.uuuuuu threadid file:line] msg
+I20250427 15:28:47.315240 140737347145280 main.cpp:6] 这是一条对于系统log的测试
+```
+
+## `glog`中每个类以及结构体的解析
+
+### `struct GLOG_EXPORT LogMessageTime`
+
+- **时间戳记录**：存储日志生成时刻的绝对时间点（精确到微秒）。
+- **时间分解**：将时间戳分解为易读的年、月、日、时、分、秒等结构化数据。
+- **时区处理**：记录与 UTC 的时区偏移（GMT Offset），便于跨时区日志分析。
+- **高效访问**：通过预计算和缓存时间分量，避免重复转换时间戳带来的性能损耗。
+
+```c++
+struct GLOG_EXPORT LogMessageTime {
+  LogMessageTime();
+  explicit LogMessageTime(std::chrono::system_clock::time_point now);
+
+    // 直接获取时间戳
+  const std::chrono::system_clock::time_point& when() const noexcept {
+    return timestamp_;
+  }
+    
+    // 在使用该结构体的时候可以方便的获取到时分秒等数据
+  int sec() const noexcept { return tm_.tm_sec; }
+  long usec() const noexcept { return usecs_.count(); }
+  int(min)() const noexcept { return tm_.tm_min; }
+  int hour() const noexcept { return tm_.tm_hour; }
+  int day() const noexcept { return tm_.tm_mday; }
+  int month() const noexcept { return tm_.tm_mon; }
+  int year() const noexcept { return tm_.tm_year; }
+  int dayOfWeek() const noexcept { return tm_.tm_wday; }
+  int dayInYear() const noexcept { return tm_.tm_yday; }
+  int dst() const noexcept { return tm_.tm_isdst; }
+  std::chrono::seconds gmtoffset() const noexcept { return gmtoffset_; }
+  const std::tm& tm() const noexcept { return tm_; }
+
+ private:
+  std::tm tm_{};  // LogMessage对象创建时间 直接使用c++11的特性直接构造
+  std::chrono::system_clock::time_point
+      timestamp_;  // LogMessage创建时间的时间戳
+  std::chrono::microseconds usecs_;// 时间戳的微秒部分
+  std::chrono::seconds gmtoffset_;// 记录时区偏移
+};
+
+// 有参构造的实现
+// 入参为Chrono库中时间点 
+LogMessageTime::LogMessageTime(std::chrono::system_clock::time_point now)
+    : timestamp_{now}// 根据时间点初始化时间戳
+{
+  std::time_t timestamp;
+  std::tie(tm_, timestamp, gmtoffset_) = Breakdown(now);// 将now值付给tm_
+  usecs_ = std::chrono::duration_cast<std::chrono::microseconds>(
+      now - std::chrono::system_clock::from_time_t(timestamp));
+    // 计算now的毫秒部分并存入usecs_中(因为 std::tm 这个类型只会记录到秒 为了确保高精度要记录微秒部分)
+}
+
+```
+
